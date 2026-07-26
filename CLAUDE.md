@@ -70,7 +70,24 @@ python src/exportar_excel.py      # export the whole DB to data/exports/mlbb_ana
 python src/analizar_partida.py [match_id]   # generate the AI coaching writeup (last match if id omitted)
 python src/reset_password.py <username>     # INTERACTIVE — admin-side password reset for the web login
 uvicorn webapp:app --app-dir src --reload   # run the web dashboard on http://localhost:8000
+python src/golden_check.py        # regression check: re-run the pipeline on data/golden/*.png and diff vs baseline.json
+python src/golden_capture.py      # re-freeze data/golden/baseline.json — only after confirming the current output is correct
 ```
+
+`golden_check.py`/`golden_capture.py` are a snapshot-testing harness (there's no
+other automated test suite): `data/golden/` holds a handful of screenshots
+that previously exposed real bugs plus a hand-verified `baseline.json` of
+what the full pipeline (OCR + icon recognition) should extract from them.
+Run `golden_check.py` before and after touching `layout.py`,
+`ocr_extraction.py`, `icon_recognition.py`, `digit_recognition.py`,
+`name_recognition.py`, or the reference corpora — any reported diff means
+something changed and needs a human look (fix vs. regression) before
+trusting it. Only re-run `golden_capture.py` to update the baseline after
+confirming a diff is an intentional improvement, never reflexively. Grow
+`data/golden/` over time by dropping in screenshots that exposed a bug once
+confirmed fixed — like the rest of `data/`, this folder is gitignored
+(real match/personal data), so only the three scripts are version-controlled,
+not the fixtures themselves.
 
 `revisar_iconos.py` and `reset_password.py` read from stdin interactively
 (`input()` / `getpass`) — they must be run in a real terminal by a human,
