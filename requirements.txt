@@ -1,0 +1,12 @@
+opencv-python
+pillow
+pytesseract
+imagehash
+pandas
+openpyxl
+anthropic
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+itsdangerous

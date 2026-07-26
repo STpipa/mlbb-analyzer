@@ -1,0 +1,24 @@
+# Entorno virtual y caché de Python
+venv/
+__pycache__/
+*.pyc
+
+# Config y secretos locales — nunca subir
+config.json
+.env
+.env.*
+
+# Todo lo de data/ es personal (capturas, base, exports) o regenerable con
+# los scripts (update_reference.py, update_knowledge.py, procesar.py) —
+# no es código fuente del proyecto, no se versiona.
+data/
+
+# Herramientas descargadas (binarios, no son código fuente del proyecto)
+tools/*.exe
+
+# Estado local de Claude Code
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Windows
+desktop.ini

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MLBB Analyzer{% endblock %}
+{% block content %}
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Partidas</div>
+    <div class="value">{{ resumen.total }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Win rate</div>
+    <div class="value">{{ resumen.winrate }}%</div>
+  </div>
+  <div class="card">
+    <div class="label">Rating prom.</div>
+    <div class="value">{{ "%.1f"|format(resumen.rating_prom) if resumen.rating_prom else "-" }}</div>
+  </div>
+  <div class="card">
+    <div class="label">KDA prom. (K/D/A)</div>
+    <div class="value">{{ "%.1f"|format(resumen.kills_prom or 0) }}/{{ "%.1f"|format(resumen.deaths_prom or 0) }}/{{ "%.1f"|format(resumen.assists_prom or 0) }}</div>
+  </div>
+</div>
+
+<h2>Evolución del rating</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">Cada punto es una partida tuya, ordenadas por fecha. Pasá el mouse por un punto para ver héroe y resultado.</p>
+<div class="chart-wrap">
+  <canvas id="chartTendencia" height="80"></canvas>
+</div>
+
+<h2>Win rate por héroe</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">Solo héroes tuyos ya reconocidos. Entre paréntesis, cuántas partidas jugaste con ese héroe.</p>
+<div class="chart-wrap">
+  <canvas id="chartHeroes" height="90"></canvas>
+</div>
+
+<h2>Partidas recientes</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Resultado</th>
+      <th>Marcador</th>
+      <th>Héroe</th>
+      <th>KDA</th>
+      <th>Rating</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in partidas %}
+    <tr class="row-link" onclick="location.href='/partida/{{ p.id }}'">
+      <td>{{ p.fecha[:16] }}</td>
+      <td class="{{ 'victory' if p.resultado == 'VICTORY' else 'defeat' }}">{{ p.resultado }}</td>
+      <td>{{ p.marcador_propio }} - {{ p.marcador_enemigo }}</td>
+      <td>{{ p.heroe or "?" }}{% if p.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
+      <td>{{ p.kills if p.kills is not none else "?" }}/{{ p.deaths if p.deaths is not none else "?" }}/{{ p.assists if p.assists is not none else "?" }}</td>
+      <td>{{ p.rating if p.rating is not none else "?" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+const tendencia = {{ tendencia | tojson }};
+const heroes = {{ heroes | tojson }};
+
+new Chart(document.getElementById('chartTendencia'), {
+  type: 'line',
+  data: {
+    labels: tendencia.map(t => t.fecha.slice(0, 10)),
+    datasets: [{
+      label: 'Rating',
+      data: tendencia.map(t => t.rating),
+      borderColor: '#d4a94a',
+      backgroundColor: 'rgba(212,169,74,0.15)',
+      tension: 0.25,
+      fill: true,
+      pointRadius: 3,
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          afterLabel: (ctx) => {
+            const t = tendencia[ctx.dataIndex];
+            return (t.heroe || '?') + ' — ' + t.resultado;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#8b96ad' }, grid: { color: '#2a3752' } },
+      y: { ticks: { color: '#8b96ad' }, grid: { color: '#2a3752' } },
+    }
+  }
+});
+
+new Chart(document.getElementById('chartHeroes'), {
+  type: 'bar',
+  data: {
+    labels: heroes.map(h => h.heroe + ' (' + h.partidas + ')'),
+    datasets: [{
+      label: 'Win rate %',
+      data: heroes.map(h => h.winrate),
+      backgroundColor: '#4a8fd4',
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { min: 0, max: 100, ticks: { color: '#8b96ad' }, grid: { color: '#2a3752' } },
+      y: { ticks: { color: '#8b96ad' }, grid: { display: false } },
+    }
+  }
+});
+</script>
+{% endblock %}

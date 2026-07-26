@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Partida {{ match_id }} - MLBB Analyzer{% endblock %}
+{% block content %}
+
+<a class="back" href="/">&larr; volver</a>
+
+<div class="cards" style="margin-top:14px;">
+  <div class="card">
+    <div class="label">Resultado</div>
+    <div class="value {{ 'victory' if match.resultado == 'VICTORY' else 'defeat' }}">{{ match.resultado }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Marcador</div>
+    <div class="value">{{ match.marcador_propio }} - {{ match.marcador_enemigo }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Duración</div>
+    <div class="value" style="font-size:1.1rem;">{{ match.duracion or "?" }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Fecha</div>
+    <div class="value" style="font-size:1.1rem;">{{ match.fecha[:16] }}</div>
+  </div>
+</div>
+
+{% macro tabla_jugadores(jugadores) %}
+<table>
+  <thead>
+    <tr><th>Jugador</th><th>Héroe</th><th>KDA</th><th>Oro</th><th>Rating</th><th>Ítems</th></tr>
+  </thead>
+  <tbody>
+    {% for j in jugadores %}
+    <tr>
+      <td>{{ j.jugador or "?" }}{% if j.lado == 'yo' %} <span class="badge" style="background:#4a8fd4;color:#fff;">VOS</span>{% endif %}{% if j.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
+      <td>{{ j.heroe or "?" }}</td>
+      <td>{{ j.kills if j.kills is not none else "?" }}/{{ j.deaths if j.deaths is not none else "?" }}/{{ j.assists if j.assists is not none else "?" }}</td>
+      <td>{{ j.oro if j.oro is not none else "?" }}</td>
+      <td>{{ j.rating if j.rating is not none else "?" }}</td>
+      <td style="font-size:0.82rem; color:var(--text-dim);">
+        {{ [j.item_1, j.item_2, j.item_3, j.item_4, j.item_5, j.item_6] | select | join(", ") }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+<h2>Tu equipo</h2>
+{{ tabla_jugadores(aliados) }}
+
+<h2>Rivales</h2>
+{{ tabla_jugadores(rivales) }}
+
+<h2>Análisis del coach</h2>
+{% if match.analisis %}
+<div class="chart-wrap" style="white-space: pre-wrap; line-height: 1.5;">{{ match.analisis }}</div>
+{% else %}
+<div class="chart-wrap">
+  <p style="color:var(--text-dim);">Todavía no se generó el análisis de esta partida.</p>
+  <form method="post" action="/partida/{{ match_id }}/analizar">
+    <button type="submit" style="background:var(--gold); color:#241a05; border:none; padding:10px 18px; border-radius:6px; font-weight:700; cursor:pointer;">
+      Generar análisis
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

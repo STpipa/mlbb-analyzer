@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MLBB Analyzer{% endblock %}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0d1321;
+    --bg-card: #161f33;
+    --border: #2a3752;
+    --text: #e6ebf5;
+    --text-dim: #8b96ad;
+    --gold: #d4a94a;
+    --blue: #4a8fd4;
+    --red: #d4544a;
+    --green: #4ad48f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header a { color: var(--gold); text-decoration: none; font-weight: 600; font-size: 1.2rem; }
+  main { padding: 24px 28px 60px; max-width: 1100px; margin: 0 auto; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card .label { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .card .value { font-size: 1.7rem; font-weight: 700; margin-top: 4px; }
+  h2 { font-size: 1.05rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 36px 0 14px; }
+  table { width: 100%; border-collapse: collapse; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+  th { color: var(--text-dim); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  tr.row-link { cursor: pointer; }
+  tr.row-link:hover { background: #1c2740; }
+  .victory { color: var(--green); font-weight: 700; }
+  .defeat { color: var(--red); font-weight: 700; }
+  .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  a.back { color: var(--blue); text-decoration: none; font-size: 0.9rem; }
+  .badge { display: inline-block; background: var(--gold); color: #241a05; font-weight: 700; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">MLBB Analyzer</a>
+  {% if username %}
+  <div style="display:flex; align-items:center; gap:14px;">
+    <a href="/subir" style="background:var(--gold); color:#241a05; text-decoration:none; font-weight:700; font-size:0.85rem; padding:8px 14px; border-radius:6px;">+ Subir captura</a>
+    <span style="color:var(--text-dim); font-size:0.85rem;">{{ username }}</span>
+    <form method="post" action="/logout" style="margin:0;">
+      <button type="submit" style="background:none; border:1px solid var(--border); color:var(--text-dim); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">Salir</button>
+    </form>
+  </div>
+  {% endif %}
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
