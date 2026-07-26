@@ -117,7 +117,16 @@ independently, but they compose in this order for a single screenshot:
    crop-boundary bugs (icons blending into neighbors, name boxes catching an
    adjacent icon or stray digits) before OCR/recognition bugs. `BLUE` and
    `RED` dicts hold the two team-column layouts; `get_row_boxes(row_index,
-   side)` offsets them per row via `ROW_TOPS`.
+   side)` offsets them per row via `ROW_TOPS`. A genuine aspect-ratio
+   mismatch (not just extra/missing footer chrome, which `normalize_to_ref_width`
+   already tolerates by design — see its docstring) is caught defensively by
+   `ocr_extraction.layout_parece_valido()`: it checks the header's
+   VICTORY/DEFEAT text (large, high-contrast, closed-vocabulary — never once
+   misread across 24 real matches) as a proxy for "did the calibrated boxes
+   land on the right content at all". `procesar.py` rejects the screenshot
+   before touching the DB if this fails, moving it to
+   `data/screenshots/layout_no_reconocido/` instead of silently producing
+   confidently-wrong crops across all 10 rows.
 2. **`ocr_extraction.py`** — Tesseract-based reading of every text/number
    field, using `layout.py`'s boxes. Numeric fields go through
    `ocr_isolated_number` (tries psm 8/7/10 in that order — this exact order

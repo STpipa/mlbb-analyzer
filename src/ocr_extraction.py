@@ -352,6 +352,30 @@ def read_row(image, row_index: int, side: str) -> dict:
     }
 
 
+def layout_parece_valido(header: dict) -> tuple[bool, str]:
+    """VICTORY/DEFEAT es texto grande, de alto contraste y vocabulario
+    cerrado — sobre las 24 partidas reales procesadas hasta ahora, este
+    campo nunca salió con ruido de OCR (ver CLAUDE.md). Si el recorte de
+    layout.RESULT_TEXT_BOX no da ninguna de las dos palabras (ni por
+    parecido difuso, por si hay ruido puntual), es la señal más confiable
+    de que esta captura no encaja con la calibración de layout.py — otro
+    dispositivo, otra versión del juego — en vez de solo un dígito mal
+    leído. Mejor rechazar la captura entera acá que procesar las 10 filas
+    con recortes corridos y guardar datos con confianza pero mal (viola la
+    filosofía del proyecto: mejor un dato faltante que uno inventado,
+    aplicada ahora a nivel captura completa y no solo campo por campo)."""
+    resultado = (header.get("result") or "").upper()
+    if "VICTORY" in resultado or "DEFEAT" in resultado:
+        return True, ""
+    mejor = max(
+        difflib.SequenceMatcher(None, resultado, "VICTORY").ratio(),
+        difflib.SequenceMatcher(None, resultado, "DEFEAT").ratio(),
+    )
+    if mejor >= 0.7:
+        return True, ""
+    return False, f"el texto de resultado leído ('{header.get('result')}') no se parece a VICTORY/DEFEAT"
+
+
 def read_header(image) -> dict:
     score_left = ocr_header_number_hibrido(image, layout.SCORE_LEFT_BOX)
     score_right = ocr_header_number_hibrido(image, layout.SCORE_RIGHT_BOX)

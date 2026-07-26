@@ -3,6 +3,11 @@ Uso diario: procesa las capturas nuevas en data/screenshots/, extrae todo
 (marcador, timer, K/D/A/oro/rating/MVP por OCR + héroe/ítems por perceptual
 hashing) y lo agrega a la base SQLite (data/db/mlbb.db). Las capturas ya
 procesadas se mueven a data/screenshots/procesadas/ para no repetirlas.
+Las que no encajan con la calibración de layout.py (no es una captura de
+post-partida de MLBB, u otro dispositivo/versión con un layout distinto) se
+rechazan ANTES de tocar la base y se mueven a
+data/screenshots/layout_no_reconocido/ para revisar a mano — ver
+ocr_extraction.layout_parece_valido().
 
 Uso: python src/procesar.py
 """
@@ -23,6 +28,7 @@ import validar_corpus
 ROOT = Path(__file__).resolve().parent.parent
 SCREENSHOTS_DIR = ROOT / "data" / "screenshots"
 PROCESSED_DIR = SCREENSHOTS_DIR / "procesadas"
+LAYOUT_MISMATCH_DIR = SCREENSHOTS_DIR / "layout_no_reconocido"
 
 
 def _to_int(txt):
@@ -78,9 +84,10 @@ def identify_icons_for_row(image, row_index: int, side: str, screenshot_stem: st
     return hero_name if hero_name != "unknown" else None, item_names
 
 
-def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int | None:
+def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> tuple[int | None, str | None]:
     """Procesa una captura y la archiva en procesadas/ si se cargó bien.
-    Devuelve el match_id nuevo, o None si se saltó (duplicada) o falló."""
+    Devuelve (match_id, None) si salió bien, o (None, motivo) si se saltó
+    (duplicada), no se pudo abrir, o el layout no fue reconocido."""
     content_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     if db.screenshot_hash_already_processed(conn, content_hash, usuario_id):
         # se archiva igual (no se reprocesa) para que data/screenshots/ solo
@@ -90,18 +97,31 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
         destino = PROCESSED_DIR / f"{fecha_corta}_duplicada_{content_hash[:8]}{path.suffix}"
         shutil.move(str(path), str(destino))
         print(f"  (ya la habías procesado antes, se archiva sin reprocesar) {path.name} -> {destino.name}")
-        return None
+        return None, "duplicada"
 
     raw = cv2.imread(str(path))
     if raw is None:
         print(f"  ERROR: no se pudo abrir {path.name}")
-        return None
+        return None, "no se pudo abrir el archivo (¿es una imagen válida?)"
     image = layout.normalize_to_ref_width(raw)
 
     partida = ocr.extraer_partida(str(path), username)
     header = partida["header"]
     my_side = partida["my_side"]
     my_row_index = partida["my_row_index"]
+
+    layout_ok, motivo_layout = ocr.layout_parece_valido(header)
+    if not layout_ok:
+        LAYOUT_MISMATCH_DIR.mkdir(parents=True, exist_ok=True)
+        destino = LAYOUT_MISMATCH_DIR / path.name
+        shutil.move(str(path), str(destino))
+        print(f"  RECHAZADA (layout no reconocido): {motivo_layout}.")
+        print(f"    Movida a {destino.relative_to(ROOT)} para revisar a mano — no se guardó nada en la base.")
+        return None, (
+            "No parece una captura de post-partida de MLBB (o es de un dispositivo/versión "
+            "que todavía no reconocemos bien). Fijate que sea la pantalla de resultado final "
+            "completa, con VICTORY/DEFEAT visible."
+        )
 
     score_blue = _to_int(header["score_left"])
     score_red = _to_int(header["score_right"])
@@ -143,7 +163,7 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
     shutil.move(str(path), str(PROCESSED_DIR / archive_name))
 
     print(f"  OK: {path.name} -> match_id={match_id} ({match_row['resultado']}, {marcador_propio}-{marcador_enemigo})")
-    return match_id
+    return match_id, None
 
 
 if __name__ == "__main__":
@@ -169,7 +189,7 @@ if __name__ == "__main__":
     for path in screenshots:
         print(f"Procesando {path.name}...")
         try:
-            match_id = process_screenshot(path, username, usuario_id, conn)
+            match_id, _motivo = process_screenshot(path, username, usuario_id, conn)
         except Exception as e:
             print(f"  ERROR procesando {path.name}: {e}")
             continue

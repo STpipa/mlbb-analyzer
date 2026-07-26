@@ -229,7 +229,7 @@ async def subir_submit(request: Request, captura: UploadFile = File(...)):
     conn = get_conn()
     try:
         try:
-            match_id = procesar.process_screenshot(dest_path, username, usuario_id, conn)
+            match_id, motivo = procesar.process_screenshot(dest_path, username, usuario_id, conn)
         except Exception as e:
             dest_path.unlink(missing_ok=True)
             return templates.TemplateResponse(
@@ -245,7 +245,7 @@ async def subir_submit(request: Request, captura: UploadFile = File(...)):
         return templates.TemplateResponse(
             request,
             "subir.html",
-            {"username": username, "error": "Esa captura ya la habías subido antes."},
+            {"username": username, "error": motivo or "No se pudo procesar la captura."},
             status_code=409,
         )
     return RedirectResponse(f"/partida/{match_id}", status_code=303)
