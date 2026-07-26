@@ -11,10 +11,12 @@ hero/items, a SQLite database, an Excel export, and an LLM coaching writeup
 per match. All comments and CLI output in the codebase are in Spanish
 (Argentine Spanish/rioplatense) — match that register when editing.
 
-No git repo is initialized. No automated test suite, linter, or build step
-exists; verification is done by running the scripts against real screenshots
-and spot-checking output (`calibrate.py`, `recognize_icons.py`, or manual DB
-queries), not by unit tests.
+Git repo initialized 2026-07-25, pushed to
+https://github.com/STpipa/mlbb-analyzer (see "Git / GitHub" section below).
+No automated test suite, linter, or build step exists; verification is done
+by running the scripts against real screenshots and spot-checking output
+(`calibrate.py`, `recognize_icons.py`, or manual DB queries), not by unit
+tests.
 
 ## Stack
 
@@ -172,8 +174,8 @@ Added after the project was single-user for a while, so some seams remain:
   every logged-in user — there's no per-user billing/API-key model.
 - Session auth is a signed cookie (`starlette.middleware.sessions`,
   `itsdangerous`), secret persisted in `data/.session_secret` (generated on
-  first run, not checked into anything since there's no git repo — treat it
-  as a secret if this ever does get version-controlled).
+  first run). `data/` is entirely gitignored (see "Git / GitHub" below), so
+  this never gets committed — keep it that way.
 
 ### Known OCR/recognition quirks worth knowing before "fixing" something
 
@@ -184,17 +186,43 @@ Added after the project was single-user for a while, so some seams remain:
   `(8, 7, 10)` first-valid-wins order in `ocr_isolated_number` is a
   deliberately-chosen least-bad tradeoff; a prior attempt at a "try all,
   pick longest" heuristic silently introduced a systematic misread and was
-  reverted. If a specific digit is still misread after everything else is
-  ruled out, it's likely this glyph-recognition limitation, not a crop
-  alignment bug — the long-term fix under consideration is template-matching
-  against the game's own digit font (same phash approach as hero/items)
-  instead of leaning on generic Tesseract.
+  reverted.
+- **`digit_recognition.py`** (added 2026-07-25) replaces Tesseract as the
+  primary reader for rating/K/D/A/gold/marcador: same philosophy as icon
+  recognition — compares an isolated digit crop against averaged templates
+  built from real confirmed samples (`mine_digit_templates.py` mines them,
+  `build_digit_templates.py` builds the templates in
+  `data/reference/digit_templates/`) instead of leaning on generic OCR.
+  `ocr_extraction.py`'s `ocr_rating_hibrido` / `ocr_header_number_hibrido` /
+  `split_stats_block_hibrido` try the template first and fall back to the
+  old Tesseract-based function per-field if the template isn't confident —
+  so it can only match or improve on the old behavior, never regress it.
+  Re-run `mine_digit_templates.py` + `build_digit_templates.py` if the
+  template corpus needs growing (e.g. a digit shape that's still
+  underrepresented).
 - Missing/ambiguous data is *always* left `NULL`/`"unknown"` rather than
   guessed — this shows up as a deliberate design choice throughout
   (recognition thresholds, OCR fallbacks returning `""`, the coaching
   prompt's system instructions telling the model not to invent values for
   fields marked "no reconocido"). Don't add guessing/fallback heuristics to
   "reduce blanks" — that's against the grain of this codebase.
+
+## Git / GitHub
+
+Repo: https://github.com/STpipa/mlbb-analyzer (`main` branch). `.gitignore`
+excludes `venv/`, `config.json`, `.env*`, `tools/*.exe`, and all of `data/`
+(personal screenshots, the SQLite DB, exports, and the reference corpora are
+either private or regenerable — see the "full reprocess" note above and
+`update_reference.py`/`update_knowledge.py` — none of it belongs in git).
+
+At the end of a work session, or after a meaningful/complete change, commit
+with a clear message describing the *why* and push to `origin/main`. This is
+standing authorization from the project owner — no need to ask for
+confirmation before each push, unless the change is unfinished/experimental
+or something seems off (e.g. `git status` shows unexpected files staged).
+Never force-push, never rewrite history on `main`, and double-check
+`git status`/`git diff` before committing so nothing in the gitignored
+categories above sneaks in by accident (e.g. via `git add -f`).
 
 ## End-of-session summary (Obsidian)
 
