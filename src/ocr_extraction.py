@@ -424,6 +424,71 @@ def detect_my_row(image) -> tuple[str, int, bool]:
     return mejor_lado, mejor_fila, confiable
 
 
+def _quitar_tag_propio(rows_blue: list, rows_red: list, username: str) -> None:
+    """Para tu propia fila alcanza con encontrar dónde aparece el username
+    configurado (config.json) dentro del nombre leído y descartar todo lo
+    de antes — no hace falta adivinar el tag, ya sabemos exactamente qué
+    buscar. A diferencia de _quitar_tags_de_clan (heurística, puede no
+    detectar nada si la evidencia en esa partida puntual es débil), esto es
+    determinístico: siempre funciona sin importar cómo haya leído el OCR el
+    tag ese día."""
+    username_compacto = username.replace(" ", "").lower()
+    if len(username_compacto) < 3:
+        return
+    for fila in rows_blue + rows_red:
+        nombre = fila["name"]
+        if not nombre:
+            continue
+        compacto = nombre.replace(" ", "").lower()
+        idx = compacto.find(username_compacto)
+        if idx <= 0:
+            continue
+        # traducir el índice del string SIN espacios de vuelta al string
+        # CON espacios, para no perder/correr separadores al recortar.
+        restantes, corte = idx, 0
+        for ch in nombre:
+            if restantes == 0:
+                break
+            if ch != " ":
+                restantes -= 1
+            corte += 1
+        fila["name"] = clean_name(nombre[corte:])
+
+
+# Tags de clan confirmados a mano (ver revisión del 2026-07-26). El mismo
+# tag real puede salir leído distinto según el OCR ("YF" vs "YES"), así que
+# entran las dos variantes. Un primer intento de DETECTARLO estadísticamente
+# por co-ocurrencia dentro de una sola partida falló en la mayoría de los
+# casos: la confirmación necesitaba encontrar el tag "separado" por un
+# espacio al menos una vez en ESA captura puntual, y la mayoría de las veces
+# viene pegado al nombre en las 10 filas de esa partida, así que nunca
+# juntaba evidencia suficiente. Mantener una lista chica y agregar acá a
+# mano cuando aparezca un tag nuevo es más simple y no tiene riesgo de
+# recortar por error un nombre real que no tiene ningún tag.
+TAGS_DE_CLAN_CONOCIDOS = {"yf", "yes"}
+
+
+def _quitar_tags_de_clan(rows_blue: list, rows_red: list) -> None:
+    """Descarta cualquiera de TAGS_DE_CLAN_CONOCIDOS del principio del
+    nombre, con o sin espacio de separación ("YF Gabvriel" -> "Gabvriel",
+    "YFSTpipa" -> "STpipa"). No hace falta el tag para saber de quién es
+    cada fila (eso ya lo resuelve detect_my_row por brillo), así que se
+    descarta directamente en vez de mostrarlo. Modifica rows_blue/rows_red
+    in-place."""
+    for fila in rows_blue + rows_red:
+        nombre = fila["name"]
+        if not nombre:
+            continue
+        for tag in sorted(TAGS_DE_CLAN_CONOCIDOS, key=len, reverse=True):
+            partes = nombre.split(" ", 1)
+            if len(partes) == 2 and partes[0].lower() == tag:
+                fila["name"] = clean_name(partes[1].strip())
+                break
+            if nombre.lower().startswith(tag) and len(nombre) - len(tag) >= 2:
+                fila["name"] = clean_name(nombre[len(tag):])
+                break
+
+
 def extraer_partida(path: str, username: str) -> dict:
     """Lee una captura de post-partida entera: header + las 10 filas de
     jugadores, con el lado 'yo'/'rival' ya resuelto. Devuelve un dict lindo
@@ -436,6 +501,8 @@ def extraer_partida(path: str, username: str) -> dict:
     header = read_header(image)
     rows_blue = [read_row(image, i, "blue") for i in range(layout.NUM_ROWS)]
     rows_red = [read_row(image, i, "red") for i in range(layout.NUM_ROWS)]
+    _quitar_tag_propio(rows_blue, rows_red, username)
+    _quitar_tags_de_clan(rows_blue, rows_red)
 
     my_side, my_row_index, confiable = detect_my_row(image)
     if not confiable:

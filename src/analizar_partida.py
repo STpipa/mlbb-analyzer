@@ -146,6 +146,14 @@ Reglas importantes:
 - Enfocate en el jugador analizado: su elección de build contra la composición rival (tipos de daño,
   roles), el timing/orden de compra si se puede inferir, y su desempeño (KDA, oro, rating) comparado
   con el resto de la partida.
+- Al juzgar si el build fue correcto, el rol/especialidad/durabilidad del héroe importa tanto como
+  a qué se enfrentaba: un héroe de daño puro (Assassin, Marksman, Mage sin especialidad de Tank/Support,
+  durabilidad baja ~1-5/10) generalmente NO debería sacrificar un ítem de su núcleo de daño por uno
+  puramente defensivo para "frenar" a un rival fuerte — su forma de lidiar con eso es jugar más atrás,
+  buscar picks más seguros o pedir ayuda del equipo, no bajar su daño. Un Tank, Fighter con especialidad
+  de Tank/Support, o alguien jugando de Roaming sí puede (y a veces debe) itemizar híbrido o defensivo.
+  No le sugieras al jugador analizado un ítem de defensa si su rol no lo sostiene, aunque el rival
+  esté fuerte — señalá en cambio qué debería haber jugado distinto.
 - Sé específico y accionable: no digas "mejorá tu farmeo" en general, decí qué ítem le faltaba dado
   lo que enfrentaba, o qué debería haber priorizado.
 - Respondé en español rioplatense, tono directo de coach, sin rodeos ni relleno. Extensión: un párrafo
