@@ -72,7 +72,13 @@ python src/reset_password.py <username>     # INTERACTIVE — admin-side passwor
 uvicorn webapp:app --app-dir src --reload   # run the web dashboard on http://localhost:8000
 python src/golden_check.py        # regression check: re-run the pipeline on data/golden/*.png and diff vs baseline.json
 python src/golden_capture.py      # re-freeze data/golden/baseline.json — only after confirming the current output is correct
+python src/validar_corpus.py      # sanity-check heroes_learned/items_learned against the wiki vocabulary (catches misfiled/mislabeled learned crops)
 ```
+
+`procesar.py`'s CLI path also runs `validar_corpus.verificar()` automatically at
+startup and prints a warning (non-blocking) if it finds anything — the
+learned-corpus corruption bug from 2026-07-26 (see below) went undetected
+for 12 matches precisely because nothing checked this before.
 
 `golden_check.py`/`golden_capture.py` are a snapshot-testing harness (there's no
 other automated test suite): `data/golden/` holds a handful of screenshots
@@ -129,7 +135,14 @@ independently, but they compose in this order for a single screenshot:
    corpus of real confirmed crops in `data/reference/heroes|items_learned/`
    (grown via `revisar_iconos.py`) — the wiki art alone is not reliable
    enough (Hamming distance to the *correct* wiki icon and to a *wrong* one
-   land in overlapping ranges), real learned crops match much better.
+   land in overlapping ranges), real learned crops match much better. The
+   learned filename convention is `<Name>__<anything>.png` — `_load_learned_hashes`
+   takes everything before the first `__` as the name, so a misnamed or
+   misfiled learned file silently poisons matching with a bogus reference
+   hash (this happened for real on 2026-07-26: name/etiqueta swapped in a
+   few filenames, and hero portraits saved into `items_learned/`, corrupting
+   12 matches' worth of item data before anyone noticed). Run
+   `validar_corpus.py` after any manual edits to these folders.
    `HERO_THRESHOLD`/`ITEM_THRESHOLD` are intentionally strict; anything above
    threshold becomes `"unknown"` rather than a guessed match, and gets saved
    to `data/review/` with its top-3 nearest candidates encoded in the

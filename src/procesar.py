@@ -18,6 +18,7 @@ import layout
 import ocr_extraction as ocr
 import icon_recognition as ic
 import database as db
+import validar_corpus
 
 ROOT = Path(__file__).resolve().parent.parent
 SCREENSHOTS_DIR = ROOT / "data" / "screenshots"
@@ -146,6 +147,11 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
 
 
 if __name__ == "__main__":
+    problemas_heroes, problemas_items = validar_corpus.verificar()
+    if problemas_heroes or problemas_items:
+        print(f"AVISO: {len(problemas_heroes) + len(problemas_items)} problema(s) en el corpus aprendido "
+              f"(python src/validar_corpus.py para el detalle) -- puede contaminar el reconocimiento. Sigo igual.\n")
+
     username = ocr.load_username()
     conn = db.get_connection()
     db.init_db(conn)
