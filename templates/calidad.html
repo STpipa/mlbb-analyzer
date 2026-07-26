@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Calidad de datos - MLBB Analyzer{% endblock %}
+{% block content %}
+
+<a class="back" href="/">&larr; volver</a>
+
+<h2 style="margin-top:20px;">Calidad de reconocimiento</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">
+  Qué tan bien está leyendo el pipeline tus capturas, sobre {{ resumen.filas }} fila(s) de jugador
+  en total. Un dato faltante (héroe/ítem/nombre "?") es siempre mejor que uno adivinado mal, así que
+  estos porcentajes no van a llegar nunca a 100%, pero deberían subir con el tiempo a medida que el
+  corpus aprendido crece.
+</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Héroes reconocidos</div>
+    <div class="value">{{ resumen.pct_heroe_ok if resumen.pct_heroe_ok is not none else "-" }}%</div>
+  </div>
+  <div class="card">
+    <div class="label">Ítems reconocidos</div>
+    <div class="value">{{ resumen.pct_item_ok if resumen.pct_item_ok is not none else "-" }}%</div>
+  </div>
+  <div class="card">
+    <div class="label">Nombres reconocidos</div>
+    <div class="value">{{ resumen.pct_nombre_ok if resumen.pct_nombre_ok is not none else "-" }}%</div>
+  </div>
+  <div class="card">
+    <div class="label">Cola de revisión</div>
+    <div class="value">{{ cola_revision }}</div>
+  </div>
+</div>
+
+<h2>Héroes reconocidos por partida, a lo largo del tiempo</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">
+  Cada punto es una partida tuya, ordenadas por fecha. Si esto viene cayendo, algo se rompió
+  (calibración, corpus corrompido); si sube, el corpus aprendido está funcionando.
+</p>
+<div class="chart-wrap">
+  <canvas id="chartCalidad" height="80"></canvas>
+</div>
+
+<script>
+const tendencia = {{ tendencia | tojson }};
+
+new Chart(document.getElementById('chartCalidad'), {
+  type: 'line',
+  data: {
+    labels: tendencia.map(t => t.fecha.slice(0, 10)),
+    datasets: [{
+      label: '% héroes reconocidos',
+      data: tendencia.map(t => t.pct_heroe_ok),
+      borderColor: '#4ad48f',
+      backgroundColor: 'rgba(74,212,143,0.15)',
+      tension: 0.25,
+      fill: true,
+      pointRadius: 3,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#8b96ad' }, grid: { color: '#2a3752' } },
+      y: { min: 0, max: 100, ticks: { color: '#8b96ad' }, grid: { color: '#2a3752' } },
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -88,6 +88,61 @@ def get_rating_trend(conn: sqlite3.Connection, usuario_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_calidad_datos(conn: sqlite3.Connection, usuario_id: int) -> dict:
+    """Resumen de cuánto reconoce bien el pipeline (héroes/ítems/nombres)
+    para las partidas de esta cuenta. Antes la única forma de notar si esto
+    empeoraba o mejoraba con un cambio era revisar la base a mano por
+    casualidad (así se encontró el bug del corpus de ítems del
+    2026-07-26) — con esto queda a la vista de un vistazo."""
+    fila = conn.execute(
+        """SELECT
+             COUNT(*) AS filas,
+             SUM(CASE WHEN p.heroe IS NULL THEN 1 ELSE 0 END) AS heroes_sin_reconocer,
+             SUM(CASE WHEN p.jugador IS NULL OR p.jugador = '' THEN 1 ELSE 0 END) AS nombres_sin_reconocer,
+             SUM(
+               (p.item_1 IS NULL) + (p.item_2 IS NULL) + (p.item_3 IS NULL) +
+               (p.item_4 IS NULL) + (p.item_5 IS NULL) + (p.item_6 IS NULL)
+             ) AS items_sin_reconocer
+           FROM match_players p
+           JOIN matches m ON m.id = p.match_id
+           WHERE m.usuario_id = ?""",
+        (usuario_id,),
+    ).fetchone()
+    d = dict(fila)
+    d["items_total"] = d["filas"] * 6
+
+    def pct_ok(sin_reconocer, total):
+        return round(100 * (1 - sin_reconocer / total), 1) if total else None
+
+    d["pct_heroe_ok"] = pct_ok(d["heroes_sin_reconocer"], d["filas"])
+    d["pct_item_ok"] = pct_ok(d["items_sin_reconocer"], d["items_total"])
+    d["pct_nombre_ok"] = pct_ok(d["nombres_sin_reconocer"], d["filas"])
+    return d
+
+
+def get_calidad_tendencia(conn: sqlite3.Connection, usuario_id: int) -> list[dict]:
+    """% de filas con héroe reconocido, una por partida y ordenado por
+    fecha, para graficar si la calidad de reconocimiento mejora o empeora
+    con el tiempo en vez de mirar un único número acumulado."""
+    rows = conn.execute(
+        """SELECT m.id, m.fecha,
+                  COUNT(*) AS filas,
+                  SUM(CASE WHEN p.heroe IS NULL THEN 1 ELSE 0 END) AS heroes_sin_reconocer
+           FROM match_players p
+           JOIN matches m ON m.id = p.match_id
+           WHERE m.usuario_id = ?
+           GROUP BY m.id
+           ORDER BY m.fecha ASC""",
+        (usuario_id,),
+    ).fetchall()
+    resultado = []
+    for r in rows:
+        d = dict(r)
+        d["pct_heroe_ok"] = round(100 * (1 - d["heroes_sin_reconocer"] / d["filas"]), 1) if d["filas"] else 0.0
+        resultado.append(d)
+    return resultado
+
+
 def count_analisis(conn: sqlite3.Connection, usuario_id: int) -> int:
     """Cuántas veces ya se generó un análisis de coach (Fase 7, consume la
     ANTHROPIC_API_KEY del host) para partidas de este usuario — para poner

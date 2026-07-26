@@ -26,6 +26,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import analizar_partida
 import auth
 import database as db
+import icon_recognition as ic
 import procesar
 import stats
 
@@ -147,6 +148,30 @@ def dashboard(request: Request):
             "partidas": partidas,
             "heroes": heroes,
             "tendencia": tendencia,
+            "username": request.session.get("username"),
+        },
+    )
+
+
+@app.get("/calidad", response_class=HTMLResponse)
+def calidad_datos(request: Request):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        resumen = stats.get_calidad_datos(conn, usuario_id)
+        tendencia = stats.get_calidad_tendencia(conn, usuario_id)
+    finally:
+        conn.close()
+    cola_revision = len(list(ic.REVIEW_DIR.glob("*.png"))) if ic.REVIEW_DIR.exists() else 0
+    return templates.TemplateResponse(
+        request,
+        "calidad.html",
+        {
+            "resumen": resumen,
+            "tendencia": tendencia,
+            "cola_revision": cola_revision,
             "username": request.session.get("username"),
         },
     )
