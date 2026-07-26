@@ -82,7 +82,13 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
     Devuelve el match_id nuevo, o None si se saltó (duplicada) o falló."""
     content_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     if db.screenshot_hash_already_processed(conn, content_hash, usuario_id):
-        print(f"  (ya la habías procesado antes, se salta) {path.name}")
+        # se archiva igual (no se reprocesa) para que data/screenshots/ solo
+        # tenga capturas realmente pendientes, no duplicados dando vueltas.
+        fecha_corta = datetime.fromtimestamp(path.stat().st_mtime).date().isoformat()
+        PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+        destino = PROCESSED_DIR / f"{fecha_corta}_duplicada_{content_hash[:8]}{path.suffix}"
+        shutil.move(str(path), str(destino))
+        print(f"  (ya la habías procesado antes, se archiva sin reprocesar) {path.name} -> {destino.name}")
         return None
 
     raw = cv2.imread(str(path))
@@ -102,13 +108,6 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
     marcador_enemigo = score_red if my_side == "blue" else score_blue
 
     fecha = datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
-    # El nombre de captura no es confiable como identificador: la app de
-    # capturas reutiliza nombres como "Captura.PNG" para fotos distintas, y
-    # ahora que hay multi-usuario dos cuentas distintas podrían llegar a
-    # subir el mismo archivo (ej. compañeros de la misma partida). Se
-    # archiva con el hash de contenido + el usuario en el nombre para que
-    # nunca se pise un archivo ya guardado.
-    archive_name = f"{path.stem}__u{usuario_id}__{content_hash[:8]}{path.suffix}"
 
     match_row = {
         "usuario_id": usuario_id,
@@ -117,10 +116,14 @@ def process_screenshot(path: Path, username: str, usuario_id: int, conn) -> int 
         "resultado": (header["result"] or "").upper() or None,
         "marcador_propio": marcador_propio,
         "marcador_enemigo": marcador_enemigo,
-        "screenshot": archive_name,
+        "screenshot": None,
         "content_hash": content_hash,
     }
     match_id = db.insert_match(conn, match_row)
+    # nombre prolijo y ordenable: fecha + número de partida + usuario. Se
+    # arma recién ahora porque necesita el match_id que asigna la base.
+    archive_name = f"{fecha[:10]}_partida{match_id:04d}_u{usuario_id}{path.suffix}"
+    db.set_screenshot_name(conn, match_id, archive_name)
 
     for row_index in range(layout.NUM_ROWS):
         for side in ("blue", "red"):

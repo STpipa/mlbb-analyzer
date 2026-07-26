@@ -17,6 +17,7 @@ import pytesseract
 
 import digit_recognition as digitrec
 import layout
+import name_recognition as namerec
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -302,6 +303,17 @@ def clean_name(raw: str) -> str:
     return " ".join(tokens)
 
 
+def leer_nombre_hibrido(image, box):
+    """EasyOCR primero (más robusto con símbolos/clanes estilizados que
+    Tesseract, ver name_recognition.py); si no está seguro, cae al recorte
+    binarizado + Tesseract de siempre — nunca peor que antes."""
+    crop_bgr = layout.crop(image, box)
+    texto, confianza = namerec.leer_nombre(crop_bgr)
+    if confianza >= 0.4 and texto.strip():
+        return clean_name(texto)
+    return clean_name(ocr_text(binarize(crop_bgr, scale=3)))
+
+
 def best_name_match_ratio(username: str, ocr_name: str) -> float:
     """Similitud difusa entre el username configurado y un nombre leído por
     OCR. Hace falta ser tolerante: el OCR de nombres estilizados con
@@ -315,7 +327,7 @@ def best_name_match_ratio(username: str, ocr_name: str) -> float:
 
 def read_row(image, row_index: int, side: str) -> dict:
     boxes = layout.get_row_boxes(row_index, side)
-    name = clean_name(ocr_text(binarize(layout.crop(image, boxes["name"]), scale=3)))
+    name = leer_nombre_hibrido(image, boxes["name"])
 
     stats_th = binarize(layout.crop(image, boxes["stats"]))
     nums = split_stats_block_hibrido(stats_th)

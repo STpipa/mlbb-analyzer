@@ -151,6 +151,11 @@ def insert_match(conn: sqlite3.Connection, match: dict) -> int:
     return cur.lastrowid
 
 
+def set_screenshot_name(conn: sqlite3.Connection, match_id: int, screenshot: str) -> None:
+    conn.execute("UPDATE matches SET screenshot = ? WHERE id = ?", (screenshot, match_id))
+    conn.commit()
+
+
 def insert_player(conn: sqlite3.Connection, match_id: int, player: dict) -> None:
     row = {"match_id": match_id, **player}
     conn.execute(
