@@ -303,6 +303,22 @@ def clean_name(raw: str) -> str:
     return " ".join(tokens)
 
 
+# El tag de clan se renderiza en dorado, bien distinto del color del
+# nombre real (celeste en el equipo azul, rosado en el rojo) — confirmado
+# con un histograma de Hue sobre cientos de recortes reales (H≈10-33 para
+# el dorado, sin superponerse con ningún color de nombre). Se probaron dos
+# formas de aprovechar esto y las dos fallaron al validar contra las 25
+# capturas reales: (1) pintar esos píxeles de negro le rompe a EasyOCR la
+# continuidad visual y arruina también las letras vecinas; (2) recortar el
+# ancho de la imagen hasta el borde del dorado generaliza bien a tags que
+# la lista curada de abajo no conoce (agarró "RRQ", "KOT", "NXG" de otros
+# clanes), pero el punto de corte a veces cae encima de la primera letra
+# real y la arruina (ej. "DLABLO" -> ")LABLO", "Marquitos9 7" ->
+# "Aarquitos9 1"). Package para retomar con más margen si hace falta; por
+# ahora queda la lista curada de TAGS_DE_CLAN_CONOCIDOS de abajo, que no
+# tiene ninguna de las dos fallas (validada sin regresiones).
+
+
 def leer_nombre_hibrido(image, box):
     """EasyOCR primero (más robusto con símbolos/clanes estilizados que
     Tesseract, ver name_recognition.py); si no está seguro, cae al recorte
