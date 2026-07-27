@@ -24,6 +24,7 @@ import ocr_extraction as ocr
 import icon_recognition as ic
 import database as db
 import validar_corpus
+import backup_db
 
 ROOT = Path(__file__).resolve().parent.parent
 SCREENSHOTS_DIR = ROOT / "data" / "screenshots"
@@ -171,6 +172,10 @@ if __name__ == "__main__":
     if problemas_heroes or problemas_items:
         print(f"AVISO: {len(problemas_heroes) + len(problemas_items)} problema(s) en el corpus aprendido "
               f"(python src/validar_corpus.py para el detalle) -- puede contaminar el reconocimiento. Sigo igual.\n")
+
+    backup_destino = backup_db.backup()
+    if backup_destino:
+        print(f"Backup de la base guardado en {backup_destino.relative_to(ROOT)}\n")
 
     username = ocr.load_username()
     conn = db.get_connection()

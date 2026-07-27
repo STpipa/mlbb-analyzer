@@ -171,14 +171,48 @@ def identificar_item(image, box):
     return identificar_icono(image, box, get_item_hashes(), ITEM_THRESHOLD)
 
 
+_review_hashes = None
+
+
+def _get_review_hashes() -> dict:
+    """Cachea el phash de cada recorte ya pendiente en data/review/, para
+    poder chequear duplicados sin releer/rehashear todo el directorio en
+    cada llamada de guardar_para_revision() dentro de la misma corrida."""
+    global _review_hashes
+    if _review_hashes is None:
+        _review_hashes = {}
+        if REVIEW_DIR.exists():
+            for path in REVIEW_DIR.glob("*.png"):
+                try:
+                    with Image.open(path) as img:
+                        _review_hashes[path] = imagehash.average_hash(img, hash_size=16)
+                except Exception:
+                    continue
+    return _review_hashes
+
+
 def guardar_para_revision(crop, etiqueta: str, top3=None) -> None:
     """Guarda un recorte no reconocido (o dudoso) en data/review/ con un
     nombre descriptivo. Si se pasan los top3 candidatos, quedan codificados
     en el nombre de archivo para que revisar_iconos.py los pueda ofrecer
-    como opciones rápidas."""
-    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    como opciones rápidas.
+
+    Antes de guardar, chequea si ya hay un recorte pendiente con el mismo
+    contenido de píxeles (mismo caso, de un reproceso anterior) y si lo hay
+    no vuelve a guardarlo — el nombre de archivo incluye el match_id, que
+    se reasigna en cada reproceso completo, así que sin este chequeo la
+    cola de revisión se llenaba de copias exactas del mismo caso (~75% de
+    los 284 casos vistos el 2026-07-26 eran justamente esto)."""
     if crop is None or crop.size == 0:
         return
+    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+
+    rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+    nuevo_hash = imagehash.average_hash(Image.fromarray(rgb), hash_size=16)
+    hashes = _get_review_hashes()
+    if any(nuevo_hash - h == 0 for h in hashes.values()):
+        return  # ya hay un caso pendiente idéntico, no duplicar
+
     suffix = ""
     if top3:
         # nombres separados por "+" (no "_", que ya aparece en varios nombres
@@ -189,3 +223,4 @@ def guardar_para_revision(crop, etiqueta: str, top3=None) -> None:
         suffix = "__" + "+".join(parts)
     dest = REVIEW_DIR / f"{etiqueta}{suffix}.png"
     cv2.imwrite(str(dest), crop)
+    hashes[dest] = nuevo_hash
