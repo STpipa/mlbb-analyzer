@@ -306,17 +306,31 @@ def clean_name(raw: str) -> str:
 # El tag de clan se renderiza en dorado, bien distinto del color del
 # nombre real (celeste en el equipo azul, rosado en el rojo) — confirmado
 # con un histograma de Hue sobre cientos de recortes reales (H≈10-33 para
-# el dorado, sin superponerse con ningún color de nombre). Se probaron dos
-# formas de aprovechar esto y las dos fallaron al validar contra las 25
-# capturas reales: (1) pintar esos píxeles de negro le rompe a EasyOCR la
-# continuidad visual y arruina también las letras vecinas; (2) recortar el
-# ancho de la imagen hasta el borde del dorado generaliza bien a tags que
-# la lista curada de abajo no conoce (agarró "RRQ", "KOT", "NXG" de otros
-# clanes), pero el punto de corte a veces cae encima de la primera letra
-# real y la arruina (ej. "DLABLO" -> ")LABLO", "Marquitos9 7" ->
-# "Aarquitos9 1"). Package para retomar con más margen si hace falta; por
-# ahora queda la lista curada de TAGS_DE_CLAN_CONOCIDOS de abajo, que no
-# tiene ninguna de las dos fallas (validada sin regresiones).
+# el dorado, sin superponerse con ningún color de nombre PROMEDIO). Tres
+# intentos de aprovechar esto se probaron y se revirtieron, cada uno con
+# una falla distinta al validar contra las 25 capturas reales:
+#   1. Pintar esos píxeles de negro antes de OCR: le rompe a EasyOCR la
+#      continuidad visual y arruina también la lectura de letras vecinas.
+#   2. Recortar el ancho de la imagen hasta el borde del dorado: generaliza
+#      bien a tags que la lista curada no conoce ("RRQ", "KOT", "NXG"), pero
+#      el punto de corte a veces caía encima de la primera letra real y la
+#      arruinaba ("DLABLO" -> ")LABLO") — el difuminado entre tag y nombre
+#      hacía que "el final del dorado" no fuera un límite seguro.
+#   3. Recortar donde EMPIEZA el texto real (no donde termina el dorado):
+#      evitó la falla del intento 2, pero reveló un problema de fondo, no
+#      de calibración: algunos jugadores decoran su propio nombre con
+#      símbolos (ej. "†Rodri", un puntito antes de "Girl...") cuyo
+#      antialiasing cae en el MISMO rango de tono/saturación que un tag de
+#      clan real (medido: ambos casos rondan H≈20-22, S hasta ~150-170) —
+#      no hay umbral de color que los separe, así que el heurístico les
+#      comía la primera letra real a esos nombres ("Girl" -> "Sirl").
+# Con tres fallas distintas confirmadas, se descartó el color como método
+# principal. Queda la lista curada de TAGS_DE_CLAN_CONOCIDOS de abajo +
+# el corte determinístico por username propio, sin ninguna de estas fallas
+# (validados sin regresiones). Si se retoma en el futuro, la señal de color
+# por sí sola no alcanza — haría falta algo más (ej. posición/tamaño
+# esperado del tag, o simplemente aceptar que ciertos nombres decorados con
+# símbolos cálidos son un caso perdido).
 
 
 def leer_nombre_hibrido(image, box):
