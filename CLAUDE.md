@@ -286,3 +286,25 @@ exhaustive):
 - Dates in `YYYY-MM-DD`.
 - Prioritize clarity and what future-you needs to pick this up again over
   exhaustively logging everything that happened.
+
+## Content para LinkedIn (Cowork)
+
+`Publicaciones LinkedIn/` (raíz del repo, gitignorado — no es código, no se
+versiona) es la carpeta que un proyecto de Cowork del usuario usa para armar
+borradores de posts de LinkedIn sobre el avance de esta app. Su propio
+`README.md` documenta la convención completa; en resumen:
+
+- Cuando se hace un cambio que valga la pena comunicar (una feature nueva,
+  un bug importante resuelto, una mejora medible), dejar en
+  `Publicaciones LinkedIn/imagenes-nuevas/` una imagen (una captura del
+  juego/dashboard si es posible, o si no una imagen generada a partir de la
+  salida de terminal relevante) + un archivo `.md` con el mismo nombre base
+  explicando qué muestra y qué se hizo — eso es lo que Cowork usa para
+  redactar el posteo correlacionado.
+- No mover ni editar nada en `imagenes-procesadas/` ni `posteos/`; esas las
+  gestiona el proceso de Cowork, no Claude Code.
+- Esto es un canal separado del resumen de Obsidian de más arriba — hay
+  además un skill programado (`linkedin-progreso-semanal`) que lee
+  `C:\Obsidian Vault\proyectos\*.md` semanalmente y arma sus propios
+  borradores a partir de las decisiones fechadas ahí, así que mantener la
+  nota de Obsidian al día también alimenta ese otro flujo indirectamente.

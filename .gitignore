@@ -20,5 +20,8 @@ tools/*.exe
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
+# Borradores de contenido para redes (Cowork), no es codigo del proyecto
+Publicaciones LinkedIn/
+
 # Windows
 desktop.ini
