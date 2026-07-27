@@ -2,6 +2,20 @@
 {% block title %}Dashboard - MLBB Analyzer{% endblock %}
 {% block content %}
 
+{% if resumen.total == 0 %}
+<div class="chart-wrap" style="text-align:center; padding:56px 24px; margin-top:20px;">
+  <h2 style="margin-top:0; color:var(--text); font-size:1.3rem; text-transform:none; letter-spacing:normal;">¡Bienvenido a MLBB Analyzer!</h2>
+  <p style="color:var(--text-dim); max-width:420px; margin:0 auto 22px; line-height:1.5;">
+    Todavía no tenés partidas cargadas. Subí tu primera captura de la pantalla de
+    resultado final (con VICTORY/DEFEAT bien visible) y en un rato la vas a ver
+    acá con todas tus estadísticas.
+  </p>
+  <a href="/subir" style="background:var(--gold); color:#241a05; text-decoration:none; font-weight:700; padding:12px 22px; border-radius:8px; display:inline-block;">
+    + Subir tu primera captura
+  </a>
+</div>
+{% else %}
+
 <div class="cards">
   <div class="card">
     <div class="label">Partidas</div>
@@ -48,12 +62,12 @@
   <tbody>
     {% for p in partidas %}
     <tr class="row-link" onclick="location.href='/partida/{{ p.id }}'">
-      <td>{{ p.fecha[:16] }}</td>
-      <td class="{{ 'victory' if p.resultado == 'VICTORY' else 'defeat' }}">{{ p.resultado }}</td>
-      <td>{{ p.marcador_propio }} - {{ p.marcador_enemigo }}</td>
-      <td>{{ p.heroe or "?" }}{% if p.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
-      <td>{{ p.kills if p.kills is not none else "?" }}/{{ p.deaths if p.deaths is not none else "?" }}/{{ p.assists if p.assists is not none else "?" }}</td>
-      <td>{{ p.rating if p.rating is not none else "?" }}</td>
+      <td data-label="Fecha">{{ p.fecha[:16] }}</td>
+      <td data-label="Resultado" class="{{ 'victory' if p.resultado == 'VICTORY' else 'defeat' }}">{{ p.resultado }}</td>
+      <td data-label="Marcador">{{ p.marcador_propio }} - {{ p.marcador_enemigo }}</td>
+      <td data-label="Héroe">{{ p.heroe or "?" }}{% if p.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
+      <td data-label="KDA">{{ p.kills if p.kills is not none else "?" }}/{{ p.deaths if p.deaths is not none else "?" }}/{{ p.assists if p.assists is not none else "?" }}</td>
+      <td data-label="Rating">{{ p.rating if p.rating is not none else "?" }}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -116,4 +130,5 @@ new Chart(document.getElementById('chartHeroes'), {
   }
 });
 </script>
+{% endif %}
 {% endblock %}

@@ -31,12 +31,12 @@
   <tbody>
     {% for j in jugadores %}
     <tr>
-      <td>{{ j.jugador or "?" }}{% if j.lado == 'yo' %} <span class="badge" style="background:#4a8fd4;color:#fff;">VOS</span>{% endif %}{% if j.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
-      <td>{{ j.heroe or "?" }}</td>
-      <td>{{ j.kills if j.kills is not none else "?" }}/{{ j.deaths if j.deaths is not none else "?" }}/{{ j.assists if j.assists is not none else "?" }}</td>
-      <td>{{ j.oro if j.oro is not none else "?" }}</td>
-      <td>{{ j.rating if j.rating is not none else "?" }}</td>
-      <td style="font-size:0.82rem; color:var(--text-dim);">
+      <td data-label="Jugador">{{ j.jugador or "?" }}{% if j.lado == 'yo' %} <span class="badge" style="background:#4a8fd4;color:#fff;">VOS</span>{% endif %}{% if j.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
+      <td data-label="Héroe">{{ j.heroe or "?" }}</td>
+      <td data-label="KDA">{{ j.kills if j.kills is not none else "?" }}/{{ j.deaths if j.deaths is not none else "?" }}/{{ j.assists if j.assists is not none else "?" }}</td>
+      <td data-label="Oro">{{ j.oro if j.oro is not none else "?" }}</td>
+      <td data-label="Rating">{{ j.rating if j.rating is not none else "?" }}</td>
+      <td data-label="Ítems" style="font-size:0.82rem; color:var(--text-dim);">
         {{ [j.item_1, j.item_2, j.item_3, j.item_4, j.item_5, j.item_6] | select | join(", ") }}
       </td>
     </tr>

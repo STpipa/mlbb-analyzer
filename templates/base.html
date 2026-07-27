@@ -59,13 +59,51 @@
   .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   a.back { color: var(--blue); text-decoration: none; font-size: 0.9rem; }
   .badge { display: inline-block; background: var(--gold); color: #241a05; font-weight: 700; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+  .nav-usuario { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* Celular: menos padding, header apilado, tablas como tarjetas en vez de
+     filas anchas (con 6 columnas no entran legibles en ~360px de ancho). */
+  @media (max-width: 640px) {
+    header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+    header a[href="/"] { font-size: 1.05rem; }
+    .nav-usuario { width: 100%; gap: 8px 12px; font-size: 0.8rem; }
+    main { padding: 16px 14px 40px; }
+    .cards { gap: 10px; }
+    .card { padding: 12px 14px; }
+    .card .value { font-size: 1.4rem; }
+    h2 { margin: 26px 0 10px; font-size: 0.95rem; }
+
+    table, thead, tbody, th, td, tr { display: block; width: 100%; }
+    table { border-collapse: separate; }
+    thead { display: none; }
+    tr { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    tr.row-link:hover { background: none; }
+    td {
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px 8px 42%;
+      position: relative;
+      min-height: 20px;
+    }
+    tr:last-child td:last-child, tr td:last-child { border-bottom: none; }
+    td::before {
+      content: attr(data-label);
+      position: absolute;
+      left: 12px;
+      width: 38%;
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+  }
 </style>
 </head>
 <body>
 <header>
   <a href="/">MLBB Analyzer</a>
   {% if username %}
-  <div style="display:flex; align-items:center; gap:14px;">
+  <div class="nav-usuario">
     <a href="/calidad" style="color:var(--text-dim); text-decoration:none; font-size:0.85rem;">Calidad de datos</a>
     <a href="/subir" style="background:var(--gold); color:#241a05; text-decoration:none; font-weight:700; font-size:0.85rem; padding:8px 14px; border-radius:6px;">+ Subir captura</a>
     <span style="color:var(--text-dim); font-size:0.85rem;">{{ username }}</span>
