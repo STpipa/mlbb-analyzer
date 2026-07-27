@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Administración - MLBB Analyzer{% endblock %}
+{% block content %}
+
+<h2 style="margin-top:0;">Cuentas</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">
+  Bloquear una cuenta le impide iniciar sesión hasta que la desbloqueás (o hasta que se cumpla el plazo elegido).
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Usuario</th>
+      <th>Creado</th>
+      <th>Admin</th>
+      <th>Estado</th>
+      <th>Acción</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in usuarios %}
+    <tr>
+      <td data-label="Usuario">{{ u.mlbb_username }}</td>
+      <td data-label="Creado">{{ u.creado[:10] }}</td>
+      <td data-label="Admin">{{ "sí" if u.is_admin else "-" }}</td>
+      <td data-label="Estado">
+        {% if u.bloqueado %}
+          <span class="defeat">
+            {% if u.banned_until == "permanente" %}bloqueado (permanente){% else %}bloqueado hasta {{ u.banned_until[:16] }}{% endif %}
+          </span>
+        {% else %}
+          <span class="victory">activo</span>
+        {% endif %}
+      </td>
+      <td data-label="Acción">
+        {% if u.id == usuario_actual_id %}
+          <span style="color:var(--text-dim); font-size:0.85rem;">(vos)</span>
+        {% elif u.is_admin %}
+          <span style="color:var(--text-dim); font-size:0.85rem;">-</span>
+        {% elif u.bloqueado %}
+          <form method="post" action="/admin/usuarios/{{ u.id }}/desbloquear" style="margin:0;">
+            <button type="submit" style="background:var(--green); color:#0d2116; border:none; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">
+              Desbloquear
+            </button>
+          </form>
+        {% else %}
+          <form method="post" action="/admin/usuarios/{{ u.id }}/ban" style="display:flex; gap:6px; align-items:center; margin:0;">
+            <select name="duracion" style="background:var(--bg-card); border:1px solid var(--border); color:var(--text); padding:6px 8px; border-radius:6px; font-size:0.8rem;">
+              <option value="1">1 día</option>
+              <option value="7">7 días</option>
+              <option value="30">30 días</option>
+              <option value="permanente">Permanente</option>
+            </select>
+            <button type="submit" style="background:var(--red); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">
+              Bloquear
+            </button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

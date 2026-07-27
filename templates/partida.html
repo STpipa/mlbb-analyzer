@@ -2,7 +2,13 @@
 {% block title %}Partida {{ match_id }} - MLBB Analyzer{% endblock %}
 {% block content %}
 
-<a class="back" href="/">&larr; volver</a>
+<a class="back" href="{{ volver_url or '/' }}">&larr; volver</a>
+
+{% if solo_lectura %}
+<p style="color:var(--text-dim); font-size:0.85rem; margin-top:10px;">
+  Estás viendo esta partida de <strong style="color:var(--text);">{{ amigo_nombre }}</strong> en modo solo lectura.
+</p>
+{% endif %}
 
 <div class="cards" style="margin-top:14px;">
   <div class="card">
@@ -71,6 +77,10 @@
 <h2>Análisis del coach</h2>
 {% if match.analisis %}
 <div class="chart-wrap" style="white-space: pre-wrap; line-height: 1.5;">{{ match.analisis }}</div>
+{% elif solo_lectura %}
+<div class="chart-wrap">
+  <p style="color:var(--text-dim);">{{ amigo_nombre }} todavía no generó el análisis de esta partida.</p>
+</div>
 {% else %}
 <div class="chart-wrap">
   <p style="color:var(--text-dim);">Todavía no se generó el análisis de esta partida.</p>

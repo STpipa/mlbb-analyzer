@@ -216,6 +216,45 @@ Added after the project was single-user for a while, so some seams remain:
   first run). `data/` is entirely gitignored (see "Git / GitHub" below), so
   this never gets committed — keep it that way.
 
+### Admin (moderation) and amigos (friends)
+
+Added 2026-07-27, same "web and CLI are different trust boundaries" spirit
+as the rest of this section:
+
+- `users.is_admin` (0/1) and `users.banned_until` (nullable TEXT) back both
+  features. `banned_until` is either `NULL` (not banned), the literal string
+  `"permanente"`, or an ISO datetime string for a timed block —
+  `database.ban_activo()` is the single place that interprets it, so don't
+  reimplement that check elsewhere.
+- **Granting admin has no web UI on purpose** — same reasoning as
+  `reset_password.py`: `python src/set_admin.py <usuario> [quitar]` is the
+  only way, run directly on the host. An admin can then ban/unban other
+  (non-admin) accounts from `/admin`; admins can't ban each other or
+  themselves (checked server-side in `webapp.py`'s `admin_ban`), so there's
+  no route to accidentally lock out the only admin.
+- A banned account is rejected at `/login` (checked *after* password
+  verification, before the session cookie is set) with a Spanish message
+  saying either the permanent-block wording or the exact until-when
+  datetime. It does not invalidate an already-active session — banning only
+  blocks the *next* login.
+- **Amigos (`friendships` table)**: a simple request/accept model
+  (`enviar_solicitud_amistad` / `responder_solicitud_amistad`, states
+  `pendiente`/`aceptado`; rejecting or canceling just deletes the row, no
+  history kept). Once accepted, either side can browse the other's match
+  list and per-match detail **read-only** at `/amigos/{friend_id}/partidas`
+  and `/amigos/{friend_id}/partida/{match_id}` (`partida.html` takes a
+  `solo_lectura` flag that hides the "Generar análisis" button — analysis
+  generation stays owner-only, since it's spent from `MAX_ANALISIS_POR_USUARIO`
+  on that owner's own quota).
+- **No automatic "same match" linking across friends.** A screenshot
+  carries no real in-game match ID, so if two friends played together and
+  each uploaded their own capture, there's no way to programmatically prove
+  those two `matches` rows are the same game — comparing them today means
+  eyeballing matching date/time between each account's match list. If this
+  becomes worth solving properly, it'd need a real matching heuristic
+  (timestamp window + overlapping enemy/ally names) rather than a schema
+  change alone.
+
 ### Known OCR/recognition quirks worth knowing before "fixing" something
 
 - Tesseract's psm mode matters per-crop in inconsistent, sometimes

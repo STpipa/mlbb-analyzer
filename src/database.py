@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mlbb_username TEXT NOT NULL UNIQUE,
     password_hash TEXT,
+    creado TEXT NOT NULL,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    banned_until TEXT
+);
+
+CREATE TABLE IF NOT EXISTS friendships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    solicitante_id INTEGER NOT NULL REFERENCES users(id),
+    destinatario_id INTEGER NOT NULL REFERENCES users(id),
+    estado TEXT NOT NULL DEFAULT 'pendiente',
     creado TEXT NOT NULL
 );
 
@@ -78,6 +88,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
     if "password_hash" not in user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    if "is_admin" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+    if "banned_until" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN banned_until TEXT")
     conn.commit()
 
 
@@ -124,6 +138,130 @@ def get_user_by_username(conn: sqlite3.Connection, mlbb_username: str) -> sqlite
 def set_password(conn: sqlite3.Connection, user_id: int, password_hash: str) -> None:
     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
     conn.commit()
+
+
+def set_admin(conn: sqlite3.Connection, user_id: int, es_admin: bool) -> None:
+    conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if es_admin else 0, user_id))
+    conn.commit()
+
+
+def set_ban(conn: sqlite3.Connection, user_id: int, banned_until: str | None) -> None:
+    """`banned_until` es None (sin bloqueo), la cadena literal "permanente",
+    o un ISO datetime hasta el cual dura el bloqueo temporal."""
+    conn.execute("UPDATE users SET banned_until = ? WHERE id = ?", (banned_until, user_id))
+    conn.commit()
+
+
+def ban_activo(banned_until: str | None) -> bool:
+    if not banned_until:
+        return False
+    if banned_until == "permanente":
+        return True
+    try:
+        return datetime.fromisoformat(banned_until) > datetime.now(timezone.utc)
+    except ValueError:
+        return False
+
+
+def list_users(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM users ORDER BY mlbb_username").fetchall()
+
+
+def enviar_solicitud_amistad(conn: sqlite3.Connection, solicitante_id: int, destinatario_id: int) -> str | None:
+    """Devuelve None si se creó bien, o un mensaje de error si no corresponde
+    (a uno mismo, ya son amigos, ya hay una solicitud pendiente en cualquier
+    dirección)."""
+    if solicitante_id == destinatario_id:
+        return "No podés agregarte a vos mismo."
+    existente = conn.execute(
+        """SELECT estado FROM friendships
+           WHERE (solicitante_id = ? AND destinatario_id = ?)
+              OR (solicitante_id = ? AND destinatario_id = ?)""",
+        (solicitante_id, destinatario_id, destinatario_id, solicitante_id),
+    ).fetchone()
+    if existente:
+        return "Ya son amigos." if existente[0] == "aceptado" else "Ya hay una solicitud pendiente."
+    conn.execute(
+        "INSERT INTO friendships (solicitante_id, destinatario_id, estado, creado) VALUES (?, ?, 'pendiente', ?)",
+        (solicitante_id, destinatario_id, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+    )
+    conn.commit()
+    return None
+
+
+def responder_solicitud_amistad(conn: sqlite3.Connection, friendship_id: int, user_id: int, aceptar: bool) -> bool:
+    """Solo el destinatario puede aceptar; destinatario o solicitante pueden
+    cancelar/rechazar (elimina la fila, no queda historial de rechazos).
+    Devuelve False si la solicitud no existe o no le corresponde a este
+    usuario tocarla."""
+    row = conn.execute("SELECT * FROM friendships WHERE id = ?", (friendship_id,)).fetchone()
+    if row is None:
+        return False
+    if aceptar:
+        if row["destinatario_id"] != user_id or row["estado"] != "pendiente":
+            return False
+        conn.execute("UPDATE friendships SET estado = 'aceptado' WHERE id = ?", (friendship_id,))
+    else:
+        if user_id not in (row["destinatario_id"], row["solicitante_id"]):
+            return False
+        conn.execute("DELETE FROM friendships WHERE id = ?", (friendship_id,))
+    conn.commit()
+    return True
+
+
+def get_solicitudes_recibidas(conn: sqlite3.Connection, user_id: int) -> list[dict]:
+    rows = conn.execute(
+        """SELECT f.id, f.creado, u.mlbb_username
+           FROM friendships f JOIN users u ON u.id = f.solicitante_id
+           WHERE f.destinatario_id = ? AND f.estado = 'pendiente'
+           ORDER BY f.creado""",
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_solicitudes_enviadas(conn: sqlite3.Connection, user_id: int) -> list[dict]:
+    rows = conn.execute(
+        """SELECT f.id, f.creado, u.mlbb_username
+           FROM friendships f JOIN users u ON u.id = f.destinatario_id
+           WHERE f.solicitante_id = ? AND f.estado = 'pendiente'
+           ORDER BY f.creado""",
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_amigos(conn: sqlite3.Connection, user_id: int) -> list[dict]:
+    rows = conn.execute(
+        """SELECT u.id, u.mlbb_username
+           FROM friendships f
+           JOIN users u ON u.id = (CASE WHEN f.solicitante_id = ? THEN f.destinatario_id ELSE f.solicitante_id END)
+           WHERE (f.solicitante_id = ? OR f.destinatario_id = ?) AND f.estado = 'aceptado'
+           ORDER BY u.mlbb_username""",
+        (user_id, user_id, user_id),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def son_amigos(conn: sqlite3.Connection, user_id_a: int, user_id_b: int) -> bool:
+    row = conn.execute(
+        """SELECT 1 FROM friendships
+           WHERE estado = 'aceptado'
+             AND ((solicitante_id = ? AND destinatario_id = ?)
+               OR (solicitante_id = ? AND destinatario_id = ?))""",
+        (user_id_a, user_id_b, user_id_b, user_id_a),
+    ).fetchone()
+    return row is not None
+
+
+def buscar_usuarios(conn: sqlite3.Connection, query: str, excluir_id: int, limite: int = 10) -> list[dict]:
+    rows = conn.execute(
+        """SELECT id, mlbb_username FROM users
+           WHERE mlbb_username LIKE ? AND id != ? AND password_hash IS NOT NULL
+           ORDER BY mlbb_username LIMIT ?""",
+        (f"%{query.lower()}%", excluir_id, limite),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def screenshot_hash_already_processed(conn: sqlite3.Connection, content_hash: str, usuario_id: int) -> bool:

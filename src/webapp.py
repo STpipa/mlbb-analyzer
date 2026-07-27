@@ -16,6 +16,7 @@ Uso:
 """
 import secrets
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -92,8 +93,16 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
         return templates.TemplateResponse(
             request, "login.html", {"error": "Usuario o contraseña incorrectos."}, status_code=401
         )
+    if db.ban_activo(user["banned_until"]):
+        if user["banned_until"] == "permanente":
+            error = "Esta cuenta fue bloqueada de forma permanente."
+        else:
+            hasta = datetime.fromisoformat(user["banned_until"]).strftime("%d/%m/%Y %H:%M")
+            error = f"Esta cuenta está bloqueada hasta el {hasta}."
+        return templates.TemplateResponse(request, "login.html", {"error": error}, status_code=403)
     request.session["user_id"] = user["id"]
     request.session["username"] = user["mlbb_username"]
+    request.session["is_admin"] = bool(user["is_admin"])
     return RedirectResponse("/", status_code=303)
 
 
@@ -121,11 +130,13 @@ def registro_submit(request: Request, username: str = Form(""), password: str = 
         # que existiera el login; se "reclama" poniéndole la contraseña ahora.
         user_id = existing["id"] if existing else db.get_or_create_user(conn, username)
         db.set_password(conn, user_id, auth.hash_password(password))
+        es_admin = bool(existing["is_admin"]) if existing else False
     finally:
         conn.close()
 
     request.session["user_id"] = user_id
     request.session["username"] = username.lower()
+    request.session["is_admin"] = es_admin
     return RedirectResponse("/", status_code=303)
 
 
@@ -137,6 +148,10 @@ def logout(request: Request):
 
 def require_login(request: Request) -> int | None:
     return request.session.get("user_id")
+
+
+def es_admin(request: Request) -> bool:
+    return bool(request.session.get("is_admin"))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -286,3 +301,225 @@ async def subir_submit(request: Request, captura: UploadFile = File(...)):
             status_code=409,
         )
     return RedirectResponse(f"/partida/{match_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Fase 10: administración (banear/bloquear cuentas). Sin flujo de "olvidé mi
+# contraseña" (ver reset_password.py); esto sigue el mismo criterio, pero
+# para moderación: quien ya es admin (otorgado por set_admin.py, a mano en el
+# host) puede bloquear cuentas problemáticas desde la web sin tocar la base
+# directamente.
+# ---------------------------------------------------------------------------
+
+_DURACIONES_BAN_DIAS = {"1": 1, "7": 7, "30": 30}
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    if not es_admin(request):
+        raise HTTPException(status_code=403, detail="No tenés permisos de administrador.")
+    conn = get_conn()
+    try:
+        usuarios = [dict(u) for u in db.list_users(conn)]
+    finally:
+        conn.close()
+    for u in usuarios:
+        u["bloqueado"] = db.ban_activo(u["banned_until"])
+    return templates.TemplateResponse(
+        request,
+        "admin.html",
+        {"usuarios": usuarios, "usuario_actual_id": usuario_id, "username": request.session.get("username")},
+    )
+
+
+@app.post("/admin/usuarios/{user_id}/ban")
+def admin_ban(request: Request, user_id: int, duracion: str = Form(...)):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    if not es_admin(request):
+        raise HTTPException(status_code=403, detail="No tenés permisos de administrador.")
+    if user_id == usuario_id:
+        raise HTTPException(status_code=400, detail="No podés bloquearte a vos mismo.")
+    conn = get_conn()
+    try:
+        objetivo = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if objetivo is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        if objetivo["is_admin"]:
+            raise HTTPException(status_code=400, detail="No se puede bloquear a otro administrador.")
+        if duracion == "permanente":
+            banned_until = "permanente"
+        else:
+            dias = _DURACIONES_BAN_DIAS.get(duracion)
+            if dias is None:
+                raise HTTPException(status_code=400, detail="Duración inválida.")
+            banned_until = (datetime.now(timezone.utc) + timedelta(days=dias)).isoformat(timespec="seconds")
+        db.set_ban(conn, user_id, banned_until)
+    finally:
+        conn.close()
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/admin/usuarios/{user_id}/desbloquear")
+def admin_unban(request: Request, user_id: int):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    if not es_admin(request):
+        raise HTTPException(status_code=403, detail="No tenés permisos de administrador.")
+    conn = get_conn()
+    try:
+        db.set_ban(conn, user_id, None)
+    finally:
+        conn.close()
+    return RedirectResponse("/admin", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Fase 10: amigos. Cada cuenta sigue siendo dueña de sus propias partidas y
+# genera su propio análisis de coach (gasta su propio cupo de
+# MAX_ANALISIS_POR_USUARIO) — lo que agrega esta sección es la posibilidad de
+# mirar en modo solo-lectura las partidas y análisis ya generados de un
+# amigo, para comparar entre compañeros de equipo. No hay forma de enlazar
+# automáticamente "esta es la misma partida que subió mi amigo": cada
+# captura no trae ningún ID de partida real, así que juntar las dos
+# perspectivas de una misma partida jugada en equipo queda, por ahora, en
+# manos de mirar fecha/hora de cada una a simple vista.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/amigos", response_class=HTMLResponse)
+def amigos_panel(request: Request, q: str = ""):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        amigos = db.get_amigos(conn, usuario_id)
+        recibidas = db.get_solicitudes_recibidas(conn, usuario_id)
+        enviadas = db.get_solicitudes_enviadas(conn, usuario_id)
+        resultados = db.buscar_usuarios(conn, q, usuario_id) if q.strip() else []
+    finally:
+        conn.close()
+    nombres_relacionados = (
+        {a["mlbb_username"] for a in amigos}
+        | {r["mlbb_username"] for r in recibidas}
+        | {e["mlbb_username"] for e in enviadas}
+    )
+    resultados = [r for r in resultados if r["mlbb_username"] not in nombres_relacionados]
+    return templates.TemplateResponse(
+        request,
+        "amigos.html",
+        {
+            "amigos": amigos,
+            "recibidas": recibidas,
+            "enviadas": enviadas,
+            "resultados": resultados,
+            "q": q,
+            "error": request.session.pop("flash_error", None),
+            "username": request.session.get("username"),
+        },
+    )
+
+
+@app.post("/amigos/solicitar")
+def amigos_solicitar(request: Request, destinatario_username: str = Form(...)):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        destinatario = db.get_user_by_username(conn, destinatario_username)
+        if destinatario is None or not destinatario["password_hash"]:
+            request.session["flash_error"] = "No existe ese usuario."
+        else:
+            error = db.enviar_solicitud_amistad(conn, usuario_id, destinatario["id"])
+            if error:
+                request.session["flash_error"] = error
+    finally:
+        conn.close()
+    return RedirectResponse("/amigos", status_code=303)
+
+
+@app.post("/amigos/{friendship_id}/aceptar")
+def amigos_aceptar(request: Request, friendship_id: int):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        db.responder_solicitud_amistad(conn, friendship_id, usuario_id, aceptar=True)
+    finally:
+        conn.close()
+    return RedirectResponse("/amigos", status_code=303)
+
+
+@app.post("/amigos/{friendship_id}/rechazar")
+def amigos_rechazar(request: Request, friendship_id: int):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        db.responder_solicitud_amistad(conn, friendship_id, usuario_id, aceptar=False)
+    finally:
+        conn.close()
+    return RedirectResponse("/amigos", status_code=303)
+
+
+@app.get("/amigos/{friend_id}/partidas", response_class=HTMLResponse)
+def amigo_partidas(request: Request, friend_id: int):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        if not db.son_amigos(conn, usuario_id, friend_id):
+            raise HTTPException(status_code=403, detail="Esa cuenta no es tu amiga.")
+        amigo = conn.execute("SELECT mlbb_username FROM users WHERE id = ?", (friend_id,)).fetchone()
+        partidas = stats.get_matches(conn, friend_id)
+    finally:
+        conn.close()
+    return templates.TemplateResponse(
+        request,
+        "amigo_partidas.html",
+        {
+            "partidas": partidas,
+            "amigo_id": friend_id,
+            "amigo_nombre": amigo["mlbb_username"],
+            "username": request.session.get("username"),
+        },
+    )
+
+
+@app.get("/amigos/{friend_id}/partida/{match_id}", response_class=HTMLResponse)
+def amigo_partida_detalle(request: Request, friend_id: int, match_id: int):
+    usuario_id = require_login(request)
+    if not usuario_id:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_conn()
+    try:
+        if not db.son_amigos(conn, usuario_id, friend_id):
+            raise HTTPException(status_code=403, detail="Esa cuenta no es tu amiga.")
+        amigo = conn.execute("SELECT mlbb_username FROM users WHERE id = ?", (friend_id,)).fetchone()
+        detalle = stats.get_match_detail(conn, match_id, friend_id)
+    finally:
+        conn.close()
+    if detalle is None:
+        raise HTTPException(status_code=404, detail="Partida no encontrada")
+    return templates.TemplateResponse(
+        request,
+        "partida.html",
+        {
+            "match_id": match_id,
+            "username": request.session.get("username"),
+            "solo_lectura": True,
+            "amigo_nombre": amigo["mlbb_username"],
+            "volver_url": f"/amigos/{friend_id}/partidas",
+            **detalle,
+        },
+    )

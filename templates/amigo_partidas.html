@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Partidas de {{ amigo_nombre }} - MLBB Analyzer{% endblock %}
+{% block content %}
+
+<a class="back" href="/amigos">&larr; volver a amigos</a>
+
+<h2 style="margin-top:14px;">Partidas de {{ amigo_nombre }}</h2>
+<p style="color:var(--text-dim); font-size:0.85rem; margin:-6px 0 12px;">Vista de solo lectura.</p>
+
+{% if not partidas %}
+<p style="color:var(--text-dim); font-size:0.85rem;">{{ amigo_nombre }} todavía no cargó ninguna partida.</p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Resultado</th>
+      <th>Marcador</th>
+      <th>Héroe</th>
+      <th>KDA</th>
+      <th>Rating</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in partidas %}
+    <tr class="row-link" onclick="location.href='/amigos/{{ amigo_id }}/partida/{{ p.id }}'">
+      <td data-label="Fecha">{{ p.fecha[:16] }}</td>
+      <td data-label="Resultado" class="{{ 'victory' if p.resultado == 'VICTORY' else 'defeat' }}">{{ p.resultado }}</td>
+      <td data-label="Marcador">{{ p.marcador_propio }} - {{ p.marcador_enemigo }}</td>
+      <td data-label="Héroe">{{ p.heroe or "?" }}{% if p.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
+      <td data-label="KDA">{{ p.kills if p.kills is not none else "?" }}/{{ p.deaths if p.deaths is not none else "?" }}/{{ p.assists if p.assists is not none else "?" }}</td>
+      <td data-label="Rating">{{ p.rating if p.rating is not none else "?" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

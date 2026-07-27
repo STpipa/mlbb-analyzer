@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Amigos - MLBB Analyzer{% endblock %}
+{% block content %}
+
+{% if error %}
+<p style="color:var(--red); font-size:0.9rem;">{{ error }}</p>
+{% endif %}
+
+<h2 style="margin-top:0;">Buscar jugadores</h2>
+<form method="get" action="/amigos" style="display:flex; gap:8px; max-width:420px; margin-bottom:12px;">
+  <input name="q" value="{{ q }}" placeholder="Nombre de usuario"
+         style="flex:1; background:var(--bg-card); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:6px;">
+  <button type="submit" style="background:var(--gold); color:#241a05; border:none; padding:10px 18px; border-radius:6px; font-weight:700; cursor:pointer;">
+    Buscar
+  </button>
+</form>
+
+{% if q and not resultados %}
+<p style="color:var(--text-dim); font-size:0.85rem;">Sin resultados para "{{ q }}".</p>
+{% endif %}
+
+{% for r in resultados %}
+<div class="card" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+  <span>{{ r.mlbb_username }}</span>
+  <form method="post" action="/amigos/solicitar" style="margin:0;">
+    <input type="hidden" name="destinatario_username" value="{{ r.mlbb_username }}">
+    <button type="submit" style="background:var(--gold); color:#241a05; border:none; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.85rem;">
+      Agregar
+    </button>
+  </form>
+</div>
+{% endfor %}
+
+{% if recibidas %}
+<h2>Solicitudes recibidas</h2>
+{% for s in recibidas %}
+<div class="card" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+  <span>{{ s.mlbb_username }}</span>
+  <div style="display:flex; gap:8px;">
+    <form method="post" action="/amigos/{{ s.id }}/aceptar" style="margin:0;">
+      <button type="submit" style="background:var(--green); color:#0d2116; border:none; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.85rem;">
+        Aceptar
+      </button>
+    </form>
+    <form method="post" action="/amigos/{{ s.id }}/rechazar" style="margin:0;">
+      <button type="submit" style="background:none; border:1px solid var(--border); color:var(--text-dim); padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem;">
+        Rechazar
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if enviadas %}
+<h2>Solicitudes enviadas</h2>
+{% for s in enviadas %}
+<div class="card" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+  <span>{{ s.mlbb_username }}</span>
+  <span style="color:var(--text-dim); font-size:0.85rem;">pendiente</span>
+  <form method="post" action="/amigos/{{ s.id }}/rechazar" style="margin:0;">
+    <button type="submit" style="background:none; border:1px solid var(--border); color:var(--text-dim); padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem;">
+      Cancelar
+    </button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>Tus amigos</h2>
+{% if not amigos %}
+<p style="color:var(--text-dim); font-size:0.85rem;">Todavía no agregaste a nadie. Buscalos arriba por su nombre de usuario.</p>
+{% else %}
+{% for a in amigos %}
+<div class="card" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+  <span>{{ a.mlbb_username }}</span>
+  <a href="/amigos/{{ a.id }}/partidas" style="color:var(--blue); text-decoration:none; font-size:0.85rem; font-weight:600;">
+    Ver sus partidas &rarr;
+  </a>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}
