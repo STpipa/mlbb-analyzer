@@ -20,6 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -53,6 +54,17 @@ def _load_or_create_secret() -> str:
 
 
 app.add_middleware(SessionMiddleware, secret_key=_load_or_create_secret())
+
+# Arte de la wiki (Fase 1, update_reference.py) para mostrar íconos en el
+# detalle de partida. A propósito NO se sirven heroes_learned/items_learned
+# acá: son recortes reales de capturas de usuarios, no arte para mostrar
+# públicamente, y su nombre de archivo puede traer la etiqueta de revisión.
+_HEROES_ICONS_DIR = ROOT / "data" / "reference" / "heroes"
+_ITEMS_ICONS_DIR = ROOT / "data" / "reference" / "items"
+if _HEROES_ICONS_DIR.exists():
+    app.mount("/iconos/heroes", StaticFiles(directory=str(_HEROES_ICONS_DIR)), name="iconos_heroes")
+if _ITEMS_ICONS_DIR.exists():
+    app.mount("/iconos/items", StaticFiles(directory=str(_ITEMS_ICONS_DIR)), name="iconos_items")
 
 
 def get_conn():

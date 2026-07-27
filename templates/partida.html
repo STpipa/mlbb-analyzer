@@ -32,12 +32,29 @@
     {% for j in jugadores %}
     <tr>
       <td data-label="Jugador">{{ j.jugador or "?" }}{% if j.lado == 'yo' %} <span class="badge" style="background:#4a8fd4;color:#fff;">VOS</span>{% endif %}{% if j.mvp_flag %}<span class="badge">MVP</span>{% endif %}</td>
-      <td data-label="Héroe">{{ j.heroe or "?" }}</td>
+      <td data-label="Héroe">
+        {% if j.heroe %}
+        <span style="display:inline-flex; align-items:center; gap:7px;">
+          <img src="/iconos/heroes/{{ j.heroe | urlencode }}.png" alt="{{ j.heroe }}" loading="lazy"
+               style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid var(--border); flex-shrink:0;"
+               onerror="this.style.display='none'">
+          {{ j.heroe }}
+        </span>
+        {% else %}?{% endif %}
+      </td>
       <td data-label="KDA">{{ j.kills if j.kills is not none else "?" }}/{{ j.deaths if j.deaths is not none else "?" }}/{{ j.assists if j.assists is not none else "?" }}</td>
       <td data-label="Oro">{{ j.oro if j.oro is not none else "?" }}</td>
       <td data-label="Rating">{{ j.rating if j.rating is not none else "?" }}</td>
-      <td data-label="Ítems" style="font-size:0.82rem; color:var(--text-dim);">
-        {{ [j.item_1, j.item_2, j.item_3, j.item_4, j.item_5, j.item_6] | select | join(", ") }}
+      <td data-label="Ítems">
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+          {% for item in [j.item_1, j.item_2, j.item_3, j.item_4, j.item_5, j.item_6] %}
+            {% if item %}
+            <img src="/iconos/items/{{ item | urlencode }}.png" alt="{{ item }}" title="{{ item }}" loading="lazy"
+                 style="width:26px; height:26px; border-radius:5px; object-fit:cover; border:1px solid var(--border);"
+                 onerror="this.style.display='none'">
+            {% endif %}
+          {% endfor %}
+        </div>
       </td>
     </tr>
     {% endfor %}
