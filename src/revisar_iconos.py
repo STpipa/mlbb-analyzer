@@ -16,6 +16,7 @@ respuesta correcta. Podés:
   - escribir 'q' para cortar la sesión acá
 """
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -43,6 +44,19 @@ def parse_filename(path: Path):
     return etiqueta, tipo, candidates
 
 
+def descripcion_legible(etiqueta: str) -> str:
+    """La etiqueta cruda ("2026-07-23_partida0001_u1_row4_blue_item5") es
+    útil para el nombre de archivo pero es ruido visual al leerla a mano —
+    la traduce a algo tipo "partida0001 — fila 5, lado azul, ítem 6"."""
+    m = re.search(r"^(.*)_row(\d+)_(blue|red)_(hero|item(\d+))$", etiqueta)
+    if not m:
+        return etiqueta
+    origen, fila, lado, tipo, slot = m.groups()
+    lado_legible = "azul" if lado == "blue" else "rojo"
+    que = "héroe" if tipo == "hero" else f"ítem (slot {int(slot) + 1})"
+    return f"{origen} — fila {int(fila) + 1}, lado {lado_legible}, {que}"
+
+
 def valid_names(tipo: str) -> set:
     if tipo == "hero":
         return {name for name, _ in ic.get_hero_hashes()}
@@ -51,8 +65,7 @@ def valid_names(tipo: str) -> set:
 
 def review_one(path: Path) -> str:
     etiqueta, tipo, candidates = parse_filename(path)
-    print(f"\n{'-'*60}\n{path.name}")
-    print(f"Tipo: {'héroe' if tipo == 'hero' else 'ítem' if tipo == 'item' else 'desconocido'}")
+    print(f"\n{'-'*60}\n{descripcion_legible(etiqueta)}")
     for i, (name, dist) in enumerate(candidates, start=1):
         print(f"  {i}) {name} (distancia={dist})")
 
